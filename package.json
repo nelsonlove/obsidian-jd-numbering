@@ -1,0 +1,26 @@
+{
+  "name": "jd-numbering",
+  "version": "0.1.0",
+  "description": "Focused Johnny Decimal numbering helpers for Obsidian.",
+  "main": "main.js",
+  "type": "module",
+  "scripts": {
+    "dev": "node esbuild.config.mjs",
+    "build": "tsc -noEmit -skipLibCheck && node esbuild.config.mjs production"
+  },
+  "keywords": [
+    "obsidian",
+    "johnny-decimal"
+  ],
+  "license": "MIT",
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "builtin-modules": "^4.0.0",
+    "esbuild": "^0.25.0",
+    "obsidian": "latest",
+    "typescript": "^5.6.0"
+  },
+  "allowScripts": {
+    "esbuild@0.25.12": true
+  }
+}
