@@ -12,6 +12,8 @@ export interface JdSettings {
 	lintOnSave: boolean;
 	/** Lint the active note when you switch to it. */
 	lintOnFileChange: boolean;
+	/** Show the active-note status-bar indicator (JD ✓ / JD ⚠ N). */
+	showStatusBar: boolean;
 	/** Also pop a notice (not just the status bar) when a lint finds issues. */
 	showLintNotice: boolean;
 }
@@ -24,6 +26,7 @@ export const DEFAULT_SETTINGS: JdSettings = {
 	leaveRedirectOnRefile: false,
 	lintOnSave: false,
 	lintOnFileChange: false,
+	showStatusBar: true,
 	showLintNotice: false,
 };
 
@@ -132,6 +135,19 @@ export class JdSettingTab extends PluginSettingTab {
 					.setValue(this.plugin.settings.lintOnFileChange)
 					.onChange(async (v) => {
 						this.plugin.settings.lintOnFileChange = v;
+						await this.plugin.saveSettings();
+						this.plugin.refreshStatusBar();
+					})
+			);
+
+		new Setting(containerEl)
+			.setName("Show status-bar indicator")
+			.setDesc("Show the active note's JD status in the status bar (JD ✓ / JD ⚠ N). Click it to run a full vault lint.")
+			.addToggle((t) =>
+				t
+					.setValue(this.plugin.settings.showStatusBar)
+					.onChange(async (v) => {
+						this.plugin.settings.showStatusBar = v;
 						await this.plugin.saveSettings();
 						this.plugin.refreshStatusBar();
 					})

@@ -86,7 +86,8 @@ export default class JdPlugin extends Plugin {
 			return;
 		}
 		const findings = lintNote(this.app, this.config, file);
-		this.renderStatus(findings);
+		if (this.settings.showStatusBar) this.renderStatus(findings);
+		else this.clearStatusBar();
 		if (notify && this.settings.showLintNotice && findings.length) {
 			const body = findings.map((f) => `• ${f.code}: ${f.message}`).join("\n");
 			new Notice(`JD — ${file.basename}\n${body}`);
@@ -94,6 +95,7 @@ export default class JdPlugin extends Plugin {
 	}
 
 	private renderStatus(findings: LintFinding[]): void {
+		this.statusBar.removeClass("jd-hidden");
 		if (findings.length === 0) {
 			this.statusBar.setText("JD ✓");
 			this.statusBar.setAttribute("aria-label", "No JD issues in this note");
@@ -112,6 +114,7 @@ export default class JdPlugin extends Plugin {
 		this.statusBar.setText("");
 		this.statusBar.removeAttribute("aria-label");
 		this.statusBar.removeClass("mod-warning");
+		this.statusBar.addClass("jd-hidden");
 	}
 
 	/** Re-evaluate the status bar (e.g. after a settings toggle). */

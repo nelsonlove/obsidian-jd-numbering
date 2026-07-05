@@ -33,6 +33,7 @@ Optionally surface JD issues for the **active note** as you work — in the spir
 
 - **Lint on save** — check the active note when it's saved/modified.
 - **Lint on file change** — check a note when you open or switch to it.
+- **Show status-bar indicator** — show the active note's status in the status bar (on by default). Turn it off to run notice-only.
 - **Show notice on issues** — also pop a notice listing the note's issues (otherwise it's status-bar only).
 
 A status-bar item shows the active note's state — `JD ✓` when clean, `JD ⚠ N` (details on hover) when not. Click it to run a full **Lint vault**. Automatic linting runs the note-local checks only; `duplicate-id` needs the whole vault, so it stays with the manual *Lint vault* command.
@@ -43,7 +44,8 @@ A status-bar item shows the active note's state — `JD ✓` when clean, `JD ⚠
 - **Index note path** — where *Refresh index* writes (default `JD index.md`).
 - **Lint report path** — where *Lint vault* writes (default `JD lint report.md`).
 - **Leave redirect stub on refile** — off by default.
-- **Lint on save** / **Lint on file change** / **Show notice on issues** — automatic linting, all off by default.
+- **Lint on save** / **Lint on file change** — automatic linting triggers, off by default.
+- **Show status-bar indicator** (on by default) / **Show notice on issues** (off by default).
 
 ## Safety
 

@@ -10,6 +10,10 @@
 	cursor: pointer;
 }
 
+.jd-statusbar.jd-hidden {
+	display: none;
+}
+
 .jd-statusbar.mod-warning {
 	color: var(--text-warning);
 }
