@@ -42,6 +42,7 @@ A status-bar item shows the active note's state — `JD ✓` when clean, `JD ⚠
 
 - **Expanded areas** / **Expanded categories** — comma-separated.
 - **Index note path** — where *Refresh index* writes (default `JD index.md`).
+- **Write lint report** — whether *Lint vault* writes/opens a report note (on by default); off = counts notice only.
 - **Lint report path** — where *Lint vault* writes (default `JD lint report.md`).
 - **Leave redirect stub on refile** — off by default.
 - **Lint on save** / **Lint on file change** — automatic linting triggers, off by default.

@@ -6,6 +6,8 @@ export interface JdSettings {
 	expandedAreas: string[];
 	expandedCategories: string[];
 	indexPath: string;
+	/** Whether JD: Lint vault writes (and opens) a report note. */
+	writeLintReport: boolean;
 	lintReportPath: string;
 	leaveRedirectOnRefile: boolean;
 	/** Lint the active note when it is saved/modified. */
@@ -22,6 +24,7 @@ export const DEFAULT_SETTINGS: JdSettings = {
 	expandedAreas: DEFAULT_CONFIG.expandedAreas,
 	expandedCategories: DEFAULT_CONFIG.expandedCategories,
 	indexPath: "JD index.md",
+	writeLintReport: true,
 	lintReportPath: "JD lint report.md",
 	leaveRedirectOnRefile: false,
 	lintOnSave: false,
@@ -85,8 +88,20 @@ export class JdSettingTab extends PluginSettingTab {
 			);
 
 		new Setting(containerEl)
+			.setName("Write lint report")
+			.setDesc("When JD: Lint vault runs, write and open a report note. When off, it just shows the counts as a notice.")
+			.addToggle((t) =>
+				t
+					.setValue(this.plugin.settings.writeLintReport)
+					.onChange(async (v) => {
+						this.plugin.settings.writeLintReport = v;
+						await this.plugin.saveSettings();
+					})
+			);
+
+		new Setting(containerEl)
 			.setName("Lint report path")
-			.setDesc("Where JD: Lint vault writes its report.")
+			.setDesc("Where JD: Lint vault writes its report (when the report is enabled).")
 			.addText((t) =>
 				t
 					.setValue(this.plugin.settings.lintReportPath)

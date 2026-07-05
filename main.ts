@@ -125,10 +125,11 @@ export default class JdPlugin extends Plugin {
 
 	async runLint(): Promise<void> {
 		const findings = lintVault(this.app, this.config);
-		const md = renderReport(findings, this.config);
-		const file = await this.writeGenerated(this.settings.lintReportPath, md);
 		const errors = findings.filter((f) => f.level === "error").length;
 		new Notice(`JD lint: ${errors} errors, ${findings.length - errors} warnings.`);
+		if (!this.settings.writeLintReport) return;
+		const md = renderReport(findings, this.config);
+		const file = await this.writeGenerated(this.settings.lintReportPath, md);
 		if (file) this.app.workspace.getLeaf(true).openFile(file);
 	}
 
