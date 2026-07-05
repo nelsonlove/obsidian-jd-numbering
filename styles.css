@@ -5,3 +5,11 @@
 	white-space: pre-wrap;
 	word-break: break-word;
 }
+
+.jd-statusbar {
+	cursor: pointer;
+}
+
+.jd-statusbar.mod-warning {
+	color: var(--text-warning);
+}

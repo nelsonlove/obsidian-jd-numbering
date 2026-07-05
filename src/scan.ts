@@ -22,12 +22,15 @@ export interface JdNote {
 	isFolderNote: boolean;
 }
 
-export interface VaultScan {
-	notes: JdNote[];
+export interface FolderMaps {
 	/** category code (e.g. "06") -> folder path of that category. */
 	categoryFolders: Map<string, string>;
 	/** area band (e.g. "00-09") -> folder path of that area. */
 	areaFolders: Map<string, string>;
+}
+
+export interface VaultScan extends FolderMaps {
+	notes: JdNote[];
 }
 
 const RE_AREA_FOLDER = /^([0-9]0-[0-9]9) /;
@@ -46,12 +49,10 @@ function tagsOf(app: App, file: TFile): string[] {
 	return out;
 }
 
-export function scanVault(app: App, cfg: JdConfig): VaultScan {
-	const notes: JdNote[] = [];
+/** Walk the vault tree and map area/category folders by their name prefix. */
+export function discoverFolders(app: App): FolderMaps {
 	const categoryFolders = new Map<string, string>();
 	const areaFolders = new Map<string, string>();
-
-	// Map area/category folders by their name prefix.
 	const walk = (folder: TFolder) => {
 		for (const child of folder.children) {
 			if (child instanceof TFolder) {
@@ -64,27 +65,32 @@ export function scanVault(app: App, cfg: JdConfig): VaultScan {
 		}
 	};
 	walk(app.vault.getRoot());
+	return { categoryFolders, areaFolders };
+}
 
-	for (const file of app.vault.getMarkdownFiles()) {
-		const cache = app.metadataCache.getFileCache(file);
-		const fm = cache?.frontmatter;
-		const frontId = fm && fm["jd-id"] != null ? String(fm["jd-id"]) : null;
-		const parsed = frontId ? parseJdId(frontId, cfg) : null;
-		const nameId = idTokenFromName(file.basename);
-		const tags = tagsOf(app, file);
-		const parentName = file.parent ? file.parent.name : "";
-		notes.push({
-			file,
-			frontId,
-			parsed,
-			nameId,
-			title: (fm && typeof fm.title === "string" && fm.title) || file.basename,
-			isRedirect: tags.includes("system/redirect"),
-			isFolderNote: file.basename === parentName,
-		});
-	}
+/** Build the JdNote view of a single file. */
+export function buildNote(app: App, file: TFile, cfg: JdConfig): JdNote {
+	const cache = app.metadataCache.getFileCache(file);
+	const fm = cache?.frontmatter;
+	const frontId = fm && fm["jd-id"] != null ? String(fm["jd-id"]) : null;
+	const parsed = frontId ? parseJdId(frontId, cfg) : null;
+	const tags = tagsOf(app, file);
+	const parentName = file.parent ? file.parent.name : "";
+	return {
+		file,
+		frontId,
+		parsed,
+		nameId: idTokenFromName(file.basename),
+		title: (fm && typeof fm.title === "string" && fm.title) || file.basename,
+		isRedirect: tags.includes("system/redirect"),
+		isFolderNote: file.basename === parentName,
+	};
+}
 
-	return { notes, categoryFolders, areaFolders };
+export function scanVault(app: App, cfg: JdConfig): VaultScan {
+	const folders = discoverFolders(app);
+	const notes = app.vault.getMarkdownFiles().map((f) => buildNote(app, f, cfg));
+	return { notes, ...folders };
 }
 
 /** All decimal parts (.YY -> integer) already used in a normal category. */
@@ -116,9 +122,9 @@ export function maxExpandedItem(scan: VaultScan, category: string): number | nul
  * Expected folder path for a parsed id, using the discovered category folder.
  * Returns null when we can't locate the category's folder.
  */
-export function expectedFolder(scan: VaultScan, id: ParsedId): string | null {
-	if (id.kind === "area") return scan.areaFolders.get(id.area) ?? null;
-	return scan.categoryFolders.get(id.category) ?? null;
+export function expectedFolder(maps: FolderMaps, id: ParsedId): string | null {
+	if (id.kind === "area") return maps.areaFolders.get(id.area) ?? null;
+	return maps.categoryFolders.get(id.category) ?? null;
 }
 
 /** Expected filename (with extension) for an id + title. */

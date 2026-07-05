@@ -1,7 +1,7 @@
 {
   "id": "jd-numbering",
   "name": "JD Numbering",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "minAppVersion": "1.5.0",
   "description": "Focused Johnny Decimal helpers: assign the next ID, lint numbering, refresh a JDex index, and refile notes to match their jd-id.",
   "author": "Nelson",

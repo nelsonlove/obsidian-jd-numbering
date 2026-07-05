@@ -1,6 +1,14 @@
-import { App } from "obsidian";
+import { App, TFile } from "obsidian";
 import { JdConfig, isStandardZero } from "./jd";
-import { VaultScan, scanVault, expectedFolder } from "./scan";
+import {
+	FolderMaps,
+	JdNote,
+	VaultScan,
+	scanVault,
+	buildNote,
+	discoverFolders,
+	expectedFolder,
+} from "./scan";
 
 export type LintLevel = "error" | "warn";
 
@@ -15,14 +23,67 @@ const RE_COLON = /:/;
 const RE_TRAILING_SPACE = / \.md$| $/;
 
 /**
- * Read-only lint of the vault against the JD conventions. Expansion-aware:
- * 5-digit expanded-area / expanded-category ids are valid, not orphans.
+ * All checks that only need the single note + the folder maps (no whole-vault
+ * context). Shared by the vault lint and the on-the-fly per-note lint.
+ * NOTE: duplicate-id is intentionally NOT here — it needs the full note set.
+ */
+export function checkNote(note: JdNote, maps: FolderMaps, cfg: JdConfig): LintFinding[] {
+	const out: LintFinding[] = [];
+	const path = note.file.path;
+	const add = (level: LintLevel, code: string, message: string) =>
+		out.push({ level, code, path, message });
+
+	// Malformed jd-id present but unparseable.
+	if (note.frontId && !note.parsed) {
+		add("error", "malformed-id", `jd-id "${note.frontId}" is not a valid JD identifier`);
+		return out;
+	}
+
+	// Filename that looks like an id but has no frontmatter id.
+	const nameLooksLikeId = /^[0-9]/.test(note.file.basename);
+	if (nameLooksLikeId && !note.frontId && !note.isFolderNote) {
+		add("warn", "missing-frontmatter-id", `filename starts with "${note.nameId}" but the note has no jd-id`);
+	}
+
+	if (!note.parsed) return out;
+	const id = note.parsed;
+
+	// Filename prefix should equal the jd-id (folder notes use area/category form).
+	if (!note.isFolderNote && note.nameId !== id.raw) {
+		add("warn", "filename-mismatch", `filename id "${note.nameId}" != jd-id "${id.raw}"`);
+	}
+
+	// Folder placement: the note's category folder should match the id's category.
+	const want = expectedFolder(maps, id);
+	const parent = note.file.parent ? note.file.parent.path : "";
+	if (want && parent !== want && !parent.startsWith(want + "/")) {
+		add("warn", "folder-mismatch", `id "${id.raw}" should live under "${want}", not "${parent}"`);
+	} else if (!want && id.kind !== "area") {
+		add("warn", "no-category-folder", `no folder found for category "${id.category}" (id ${id.raw})`);
+	}
+
+	// Naming hygiene.
+	if (RE_COLON.test(note.file.name)) {
+		add("error", "colon-in-name", "filenames must not contain a colon");
+	}
+	if (RE_TRAILING_SPACE.test(note.file.name)) {
+		add("warn", "trailing-space", "filename has a trailing space");
+	}
+
+	if (isStandardZero(id) && note.isRedirect) {
+		add("warn", "redirect-on-zero", `redirect stub occupies standard-zero ${id.raw}`);
+	}
+
+	return out;
+}
+
+/**
+ * Read-only lint of the whole vault. Expansion-aware: 5-digit expanded-area /
+ * expanded-category ids are valid, not orphans.
  */
 export function lintVault(app: App, cfg: JdConfig, scan?: VaultScan): LintFinding[] {
 	const s = scan ?? scanVault(app, cfg);
 	const findings: LintFinding[] = [];
-	const add = (level: LintLevel, code: string, path: string, message: string) =>
-		findings.push({ level, code, path, message });
 
 	// Duplicate jd-id (ignoring redirect stubs, which intentionally reuse an id).
 	const byId = new Map<string, string[]>();
@@ -35,62 +96,28 @@ export function lintVault(app: App, cfg: JdConfig, scan?: VaultScan): LintFindin
 	for (const [id, paths] of byId) {
 		if (paths.length > 1) {
 			for (const p of paths)
-				add("error", "duplicate-id", p, `jd-id "${id}" is used by ${paths.length} notes`);
+				findings.push({
+					level: "error",
+					code: "duplicate-id",
+					path: p,
+					message: `jd-id "${id}" is used by ${paths.length} notes`,
+				});
 		}
 	}
 
-	for (const n of s.notes) {
-		const path = n.file.path;
+	// Per-note checks.
+	for (const n of s.notes) findings.push(...checkNote(n, s, cfg));
 
-		// Malformed jd-id present but unparseable.
-		if (n.frontId && !n.parsed) {
-			add("error", "malformed-id", path, `jd-id "${n.frontId}" is not a valid JD identifier`);
-			continue;
-		}
-
-		// Filename that looks like an id but has no / a different frontmatter id.
-		const nameLooksLikeId = /^[0-9]/.test(n.file.basename);
-		if (nameLooksLikeId && !n.frontId && !n.isFolderNote) {
-			add("warn", "missing-frontmatter-id", path, `filename starts with "${n.nameId}" but the note has no jd-id`);
-		}
-
-		if (!n.parsed) continue;
-		const id = n.parsed;
-
-		// Filename prefix should equal the jd-id (folder notes use area/category form).
-		if (!n.isFolderNote && n.nameId !== id.raw) {
-			add("warn", "filename-mismatch", path, `filename id "${n.nameId}" != jd-id "${id.raw}"`);
-		}
-
-		// Folder placement: the note's category folder should match the id's category.
-		const want = expectedFolder(s, id);
-		const parent = n.file.parent ? n.file.parent.path : "";
-		if (want && parent !== want && !parent.startsWith(want + "/")) {
-			add("warn", "folder-mismatch", path, `id "${id.raw}" should live under "${want}", not "${parent}"`);
-		} else if (!want && id.kind !== "area") {
-			add("warn", "no-category-folder", path, `no folder found for category "${id.category}" (id ${id.raw})`);
-		}
-
-		// Naming hygiene.
-		if (RE_COLON.test(n.file.name)) {
-			add("error", "colon-in-name", path, "filenames must not contain a colon");
-		}
-		if (RE_TRAILING_SPACE.test(n.file.name)) {
-			add("warn", "trailing-space", path, "filename has a trailing space");
-		}
-
-		// Standard-zero sanity: a .00–.09 note filed as content is usually a mistake
-		// only when it is not a folder/zero note; we simply note it for review.
-		if (isStandardZero(id) && n.isRedirect) {
-			add("warn", "redirect-on-zero", path, `redirect stub occupies standard-zero ${id.raw}`);
-		}
-	}
-
-	// Sort: errors first, then by path.
 	findings.sort((a, b) =>
 		a.level === b.level ? a.path.localeCompare(b.path) : a.level === "error" ? -1 : 1
 	);
 	return findings;
+}
+
+/** On-the-fly lint of a single note (no duplicate detection). */
+export function lintNote(app: App, cfg: JdConfig, file: TFile): LintFinding[] {
+	const maps = discoverFolders(app);
+	return checkNote(buildNote(app, file, cfg), maps, cfg);
 }
 
 export function renderReport(findings: LintFinding[], cfg: JdConfig): string {

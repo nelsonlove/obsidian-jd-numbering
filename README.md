@@ -27,12 +27,23 @@ Valid ID shapes include more than `XX.YY`:
 
 These are configured in settings (defaults: expanded area `90-99`, expanded category `27`) and are **not** flagged as errors by the linter. Malformed shapes like `26 2.18` are.
 
+## Automatic linting
+
+Optionally surface JD issues for the **active note** as you work — in the spirit of Obsidian Linter's *Lint on save* / *Lint on file change*, but **read-only**: it never moves or renames files.
+
+- **Lint on save** — check the active note when it's saved/modified.
+- **Lint on file change** — check a note when you open or switch to it.
+- **Show notice on issues** — also pop a notice listing the note's issues (otherwise it's status-bar only).
+
+A status-bar item shows the active note's state — `JD ✓` when clean, `JD ⚠ N` (details on hover) when not. Click it to run a full **Lint vault**. Automatic linting runs the note-local checks only; `duplicate-id` needs the whole vault, so it stays with the manual *Lint vault* command.
+
 ## Settings
 
 - **Expanded areas** / **Expanded categories** — comma-separated.
 - **Index note path** — where *Refresh index* writes (default `JD index.md`).
 - **Lint report path** — where *Lint vault* writes (default `JD lint report.md`).
 - **Leave redirect stub on refile** — off by default.
+- **Lint on save** / **Lint on file change** / **Show notice on issues** — automatic linting, all off by default.
 
 ## Safety
 
