@@ -94,6 +94,22 @@ export function isExpandedCategory(cat: string, cfg: JdConfig): boolean {
 	);
 }
 
+/**
+ * The canonical `jd-id` a folder note should carry, derived from its filename
+ * id-token. Folder notes have a deliberate asymmetry between name and prop:
+ *   - area folder note      "A0-A9 Title"  -> jd-id "A0-A9"     (e.g. 00-09)
+ *   - category folder note  "AC Title"     -> jd-id "AC.00"     (standard-zero home)
+ * Returns null when the token is not an area/category id (i.e. not a folder-note
+ * shape — e.g. an "AC.YY" content id or a 5-digit expanded item).
+ */
+export function canonicalFolderNoteId(nameToken: string, cfg: JdConfig): string | null {
+	const p = parseJdId(nameToken, cfg);
+	if (!p) return null;
+	if (p.kind === "area") return p.raw; // 00-09 -> 00-09
+	if (p.kind === "category") return `${p.raw}.00`; // 04 -> 04.00
+	return null;
+}
+
 /** Standard-zero slots .00–.09 are reserved for infrastructure, not content. */
 export function isStandardZero(id: ParsedId): boolean {
 	if (id.kind !== "id") return false;

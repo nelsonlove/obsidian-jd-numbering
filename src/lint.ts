@@ -1,5 +1,5 @@
 import { App, TFile } from "obsidian";
-import { JdConfig, isStandardZero } from "./jd";
+import { JdConfig, isStandardZero, canonicalFolderNoteId } from "./jd";
 import {
 	FolderMaps,
 	JdNote,
@@ -8,6 +8,7 @@ import {
 	buildNote,
 	discoverFolders,
 	expectedFolder,
+	classifyFolderNote,
 } from "./scan";
 
 export type LintLevel = "error" | "warn";
@@ -37,6 +38,23 @@ export function checkNote(note: JdNote, maps: FolderMaps, cfg: JdConfig): LintFi
 	if (note.frontId && !note.parsed) {
 		add("error", "malformed-id", `jd-id "${note.frontId}" is not a valid JD identifier`);
 		return out;
+	}
+
+	// Area/category folder notes carry their id per convention (area -> "A0-A9",
+	// category -> "AC.00"). Runs before the `!parsed` early-return below so that a
+	// folder note missing its id (parsed === null) is still caught here.
+	const folderNoteKind = classifyFolderNote(
+		note.isFolderNote,
+		note.file.parent ? note.file.parent.path : "",
+		maps
+	);
+	if (folderNoteKind) {
+		const want = canonicalFolderNoteId(note.nameId, cfg);
+		if (want && !note.frontId) {
+			add("warn", "missing-folder-note-id", `${folderNoteKind} folder note should carry jd-id "${want}" but has none`);
+		} else if (want && note.frontId && note.frontId !== want) {
+			add("warn", "folder-note-id-mismatch", `${folderNoteKind} folder note jd-id "${note.frontId}" should be "${want}"`);
+		}
 	}
 
 	// Filename that looks like an id but has no frontmatter id.

@@ -1,3 +1,6 @@
 node_modules/
 main.js
 *.map
+
+# headless test bundle
+test/.suite.out.mjs
