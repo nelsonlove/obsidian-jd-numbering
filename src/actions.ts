@@ -57,6 +57,13 @@ export async function assignNextNumber(app: App, cfg: JdConfig): Promise<void> {
 	}
 	const scan = scanVault(app, cfg);
 
+	// Folder notes keep their area/category id; a content number would be wrong.
+	const self = scan.notes.find((n) => n.file.path === file.path);
+	if (self && self.isFolderNote) {
+		new Notice("JD: folder notes keep their area/category id — not assigning.");
+		return;
+	}
+
 	const proceed = (category: string) => {
 		const id = nextId(scan, cfg, category);
 		if (!id) {
@@ -117,7 +124,11 @@ export async function refileToMatchId(app: App, cfg: JdConfig, leaveRedirect: bo
 		return;
 	}
 	const title = note.title.replace(/^[0-9.]+\s+/, "");
-	const dest = targetPath(folder, id.raw, title);
+	// A folder note's filename is its area/category token ("00-09", "04"), not its
+	// full jd-id ("00-09", "04.00"). Renaming it to id.raw would corrupt the folder
+	// note (basename would no longer match the parent folder), so keep the token.
+	const nameId = note.isFolderNote ? note.nameId : id.raw;
+	const dest = targetPath(folder, nameId, title);
 	if (dest === file.path) {
 		new Notice("JD: already correctly filed.");
 		return;

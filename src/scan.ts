@@ -58,8 +58,14 @@ export function discoverFolders(app: App): FolderMaps {
 			if (child instanceof TFolder) {
 				const am = child.name.match(RE_AREA_FOLDER);
 				if (am && !areaFolders.has(am[1])) areaFolders.set(am[1], child.path);
+				// A category folder is an "AC Name" folder that sits directly under an
+				// area folder. The area-parent requirement stops deep content folders
+				// that merely start with two digits (e.g. ".../CAOS commands/04 CD Player")
+				// from being mistaken for category 04.
 				const cm = child.name.match(RE_CAT_FOLDER);
-				if (cm && !categoryFolders.has(cm[1])) categoryFolders.set(cm[1], child.path);
+				if (cm && RE_AREA_FOLDER.test(folder.name) && !categoryFolders.has(cm[1])) {
+					categoryFolders.set(cm[1], child.path);
+				}
 				walk(child);
 			}
 		}
@@ -125,6 +131,24 @@ export function maxExpandedItem(scan: VaultScan, category: string): number | nul
 export function expectedFolder(maps: FolderMaps, id: ParsedId): string | null {
 	if (id.kind === "area") return maps.areaFolders.get(id.area) ?? null;
 	return maps.categoryFolders.get(id.category) ?? null;
+}
+
+/**
+ * Classify a folder note as an area or category folder note, using the folder
+ * maps. A note is an area/category folder note when it is a folder note
+ * (basename == parent name) whose own folder is a discovered area/category
+ * folder. Returns null for non-folder-notes or folder notes that don't sit in a
+ * JD area/category folder (e.g. an arbitrary "04 CD Player" content folder).
+ */
+export function classifyFolderNote(
+	isFolderNote: boolean,
+	folderPath: string,
+	maps: FolderMaps
+): "area" | "category" | null {
+	if (!isFolderNote) return null;
+	for (const p of maps.areaFolders.values()) if (p === folderPath) return "area";
+	for (const p of maps.categoryFolders.values()) if (p === folderPath) return "category";
+	return null;
 }
 
 /** Expected filename (with extension) for an id + title. */
