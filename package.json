@@ -1,6 +1,6 @@
 {
   "name": "jd-numbering",
-  "version": "0.2.2",
+  "version": "0.3.0",
   "description": "Focused Johnny Decimal numbering helpers for Obsidian.",
   "main": "main.js",
   "type": "module",
