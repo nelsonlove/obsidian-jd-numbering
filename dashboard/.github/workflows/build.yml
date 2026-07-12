@@ -1,0 +1,43 @@
+name: build
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+# Cancel an in-flight run when a new push lands on the same ref — saves
+# minutes and surfaces feedback for the latest commit faster. github.ref
+# is the canonical refs/heads/... or refs/pull/N/merge string, not
+# user-controlled text, so safe to use in this group key.
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: true
+
+# Defense-in-depth: GITHUB_TOKEN gets read-only access. Bump per-job if
+# a future step needs to write (e.g. an auto-release job posting assets).
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      # SHA-pinned for supply-chain hardening; bump these (and the
+      # trailing version comment) when the action ships a release worth
+      # taking. Floating @v4 would silently move under us.
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: "22"
+          cache: "npm"
+
+      - run: npm ci
+
+      - run: npx tsc --noEmit
+
+      - run: npm run build
+
+      - name: Verify main.js was built
+        run: test -f main.js

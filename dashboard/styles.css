@@ -1,0 +1,320 @@
+/* Johnny Decimal Dashboard — plugin styles */
+
+.jd-inbox-dashboard {
+	padding: 8px;
+}
+
+.jd-inbox-header {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	margin-bottom: 12px;
+}
+
+.jd-inbox-header h3 {
+	margin: 0;
+	font-size: 14px;
+	font-weight: 600;
+}
+
+.jd-inbox-total {
+	background: var(--interactive-accent);
+	color: var(--text-on-accent);
+	border-radius: 10px;
+	padding: 2px 8px;
+	font-size: 12px;
+	font-weight: 600;
+}
+
+.jd-inbox-empty {
+	color: var(--text-muted);
+	font-style: italic;
+	font-size: 13px;
+}
+
+.jd-inbox-area {
+	margin-bottom: 12px;
+}
+
+.jd-inbox-area-name {
+	font-size: 11px;
+	text-transform: uppercase;
+	letter-spacing: 0.05em;
+	color: var(--text-muted);
+	margin: 0 0 4px 0;
+	padding: 0;
+}
+
+.jd-inbox-list {
+	list-style: none;
+	padding: 0;
+	margin: 0;
+}
+
+.jd-inbox-item {
+	cursor: pointer;
+	border-radius: 4px;
+	padding: 4px 8px;
+}
+
+.jd-inbox-item:hover {
+	background: var(--background-modifier-hover);
+}
+
+.jd-inbox-row {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+}
+
+.jd-inbox-name {
+	font-size: 13px;
+	flex: 1;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.jd-inbox-count {
+	font-size: 12px;
+	font-weight: 600;
+	color: var(--text-muted);
+	margin-left: 8px;
+	min-width: 20px;
+	text-align: right;
+}
+
+.jd-inbox-footer {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	margin-top: 12px;
+	padding-top: 8px;
+	border-top: 1px solid var(--background-modifier-border);
+}
+
+.jd-inbox-timestamp {
+	font-size: 11px;
+	color: var(--text-faint);
+}
+
+.jd-inbox-refresh {
+	background: none;
+	border: none;
+	cursor: pointer;
+	color: var(--text-muted);
+	padding: 4px;
+	border-radius: 4px;
+}
+
+.jd-inbox-refresh:hover {
+	background: var(--background-modifier-hover);
+	color: var(--text-normal);
+}
+
+/* Go to ID modal */
+.jd-goto-row {
+	display: flex;
+	align-items: center;
+	gap: 12px;
+}
+
+.jd-goto-id {
+	font-family: var(--font-monospace);
+	font-size: 13px;
+	color: var(--text-accent);
+	min-width: 48px;
+}
+
+.jd-goto-title {
+	font-size: 13px;
+}
+
+/* Drift panel */
+.jd-drift-panel {
+	padding: 8px;
+}
+
+.jd-drift-header {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	margin-bottom: 12px;
+}
+
+.jd-drift-header h3 {
+	margin: 0;
+	font-size: 14px;
+	font-weight: 600;
+}
+
+.jd-drift-total {
+	background: var(--color-red);
+	color: var(--text-on-accent);
+	border-radius: 10px;
+	padding: 2px 8px;
+	font-size: 12px;
+	font-weight: 600;
+}
+
+.jd-drift-total.jd-drift-clean {
+	background: var(--color-green);
+}
+
+.jd-drift-empty {
+	color: var(--text-muted);
+	font-style: italic;
+	font-size: 13px;
+}
+
+.jd-drift-section {
+	margin-bottom: 8px;
+}
+
+.jd-drift-section-header {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	font-size: 13px;
+	font-weight: 600;
+	cursor: pointer;
+	padding: 4px 0;
+	user-select: none;
+}
+
+.jd-drift-section-icon {
+	display: flex;
+	color: var(--text-muted);
+}
+
+.jd-drift-section-icon svg {
+	width: 14px;
+	height: 14px;
+}
+
+.jd-drift-fix-all {
+	margin-left: auto;
+	background: none;
+	border: none;
+	cursor: pointer;
+	color: var(--text-muted);
+	padding: 2px 4px;
+	border-radius: 4px;
+}
+
+.jd-drift-fix-all:hover {
+	background: var(--background-modifier-hover);
+	color: var(--interactive-accent);
+}
+
+.jd-drift-list {
+	list-style: none;
+	padding: 0;
+	margin: 4px 0 0 0;
+}
+
+.jd-drift-item {
+	border-radius: 4px;
+	padding: 4px 8px;
+	margin-bottom: 2px;
+}
+
+.jd-drift-item:hover {
+	background: var(--background-modifier-hover);
+}
+
+.jd-drift-row {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	cursor: pointer;
+}
+
+.jd-drift-id {
+	font-family: var(--font-monospace);
+	font-size: 12px;
+	color: var(--text-accent);
+	min-width: 40px;
+}
+
+.jd-drift-title {
+	font-size: 13px;
+	flex: 1;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.jd-drift-detail {
+	font-size: 11px;
+	color: var(--text-muted);
+	margin-top: 2px;
+	padding-left: 48px;
+}
+
+.jd-drift-actions {
+	display: flex;
+	gap: 4px;
+	margin-top: 2px;
+	padding-left: 48px;
+}
+
+.jd-drift-action-btn {
+	background: none;
+	border: none;
+	cursor: pointer;
+	color: var(--text-muted);
+	padding: 2px;
+	border-radius: 4px;
+}
+
+.jd-drift-action-btn:hover {
+	background: var(--background-modifier-hover);
+	color: var(--interactive-accent);
+}
+
+.jd-drift-action-btn svg {
+	width: 14px;
+	height: 14px;
+}
+
+.jd-drift-stub {
+	opacity: 0.7;
+}
+
+.jd-drift-footer {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	margin-top: 12px;
+	padding-top: 8px;
+	border-top: 1px solid var(--background-modifier-border);
+}
+
+.jd-drift-timestamp {
+	font-size: 11px;
+	color: var(--text-faint);
+}
+
+.jd-drift-refresh {
+	background: none;
+	border: none;
+	cursor: pointer;
+	color: var(--text-muted);
+	padding: 4px;
+	border-radius: 4px;
+}
+
+.jd-drift-refresh:hover {
+	background: var(--background-modifier-hover);
+	color: var(--text-normal);
+}
+
+/* Status bar — clickable drift count */
+.jd-status-drift {
+	cursor: pointer;
+}
+
+.jd-status-drift:hover {
+	color: var(--text-accent);
+}
