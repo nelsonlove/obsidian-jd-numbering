@@ -24,8 +24,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # Both plugins in the monorepo: the numbering plugin at the repo
-        # root and the dashboard plugin under dashboard/.
+        # Both plugins in the monorepo, each self-contained under packages/.
         package: ["packages/numbering", "packages/dashboard"]
     defaults:
       run:

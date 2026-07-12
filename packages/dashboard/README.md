@@ -4,6 +4,14 @@ Live JD system awareness inside the Obsidian vault. Inbox dashboard, drift detec
 
 Companion plugin to the [jd-tools](https://github.com/nelsonlove/jd-tools) CLI suite. Reads the same `jd-index.yaml` and `jd.yaml` that jd-cli uses, but has no runtime dependency on it — either tool can be installed and used independently. The two coordinate purely through the shared YAML files.
 
+## Install (BRAT)
+
+Distributed through a thin generated repo so [BRAT](https://github.com/TfTHacker/obsidian42-brat) can read `manifest.json` from a repo root (this plugin lives under `packages/dashboard/` in the jd-numbering monorepo):
+
+1. Install the BRAT community plugin.
+2. BRAT → **Add beta plugin** → `nelsonlove/jd-dashboard-brat`.
+3. Enable **Johnny Decimal Dashboard** in Community plugins.
+
 ## Features
 
 ### Inbox Dashboard

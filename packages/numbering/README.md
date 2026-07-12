@@ -54,8 +54,10 @@ Destructive commands (*Assign*, *Refile*) act on the **active note only** and al
 
 ## Install (BRAT)
 
-1. Install the [BRAT](https://github.com/TfTHacker/obsidian42-brat) community plugin.
-2. BRAT → **Add beta plugin** → `nelsonlove/jd-numbering`.
+This plugin is distributed through a thin generated repo so [BRAT](https://github.com/TfTHacker/obsidian42-brat) can read `manifest.json` from a repo root (this plugin lives under `packages/numbering/` in a monorepo, so the monorepo root is not itself BRAT-installable):
+
+1. Install the BRAT community plugin.
+2. BRAT → **Add beta plugin** → `nelsonlove/jd-numbering-brat`.
 3. Enable **JD Numbering** in Community plugins.
 
 ## Develop
@@ -66,20 +68,11 @@ npm run dev     # watch build
 npm run build   # type-check + production bundle
 ```
 
-Releases are cut by pushing a tag (`x.y.z`) — see `.github/workflows/release.yml`.
+Releases are cut by pushing a per-package tag `numbering-vX.Y.Z` (matching this
+package's `manifest.json` version); CI builds the plugin and mirrors the built
+files into `nelsonlove/jd-numbering-brat`. See the repo-root README and
+`.github/workflows/release.yml`.
 
 ## License
 
 MIT
-
-## Also in this repo
-
-The [`dashboard/`](dashboard) directory holds a companion Obsidian plugin,
-**Johnny Decimal Dashboard** (`jd-dashboard`) — inbox dashboard, drift
-detection, and quick ID navigation. It was folded in from the former
-standalone `jd-obsidian` repo (with full history) and is built independently;
-see [`dashboard/README.md`](dashboard/README.md).
-
-> Note: only this root plugin (`jd-numbering`) is installable via BRAT
-> (`nelsonlove/jd-numbering`), since BRAT reads `manifest.json` from the repo
-> root. The dashboard is built/installed from its own directory.

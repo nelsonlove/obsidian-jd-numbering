@@ -7,13 +7,19 @@ name: Publish plugin to its BRAT shim
 #   numbering-v1.2.3  ->  packages/numbering  ->  nelsonlove/jd-numbering-brat
 #   dashboard-v1.2.3  ->  packages/dashboard  ->  nelsonlove/jd-dashboard-brat
 #
-# workflow_dispatch is provided for manual re-syncs (no tag needed).
+# The tag's version (the part after `-v`) must equal the package's
+# manifest.json version, or the run fails.
+#
+# The trigger is deliberately broad (`*`): an unrecognized tag (e.g. a bare
+# semver `0.4.0`) still starts the job and fails LOUDLY in "Resolve target"
+# rather than silently doing nothing.
+#
+# workflow_dispatch is provided for manual re-syncs (no version check).
 
 on:
   push:
     tags:
-      - "numbering-v*"
-      - "dashboard-v*"
+      - "*"
   workflow_dispatch:
     inputs:
       package:
@@ -33,8 +39,8 @@ jobs:
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
 
-      # Resolve the package from the tag prefix (or the manual input) without
-      # interpolating untrusted text into the shell body.
+      # Resolve the package + expected version without interpolating untrusted
+      # text into the shell body. Unrecognized tags exit non-zero here.
       - name: Resolve target
         id: t
         env:
@@ -43,9 +49,13 @@ jobs:
           INPUT_PKG: ${{ inputs.package }}
         run: |
           if [ "$EVENT" = "workflow_dispatch" ]; then
-            PKG="$INPUT_PKG"
+            PKG="$INPUT_PKG"; TAGVER=""
           else
-            PKG="${TAG%%-*}"   # strip -vX.Y.Z suffix
+            case "$TAG" in
+              numbering-v*) PKG=numbering; TAGVER="${TAG#numbering-v}" ;;
+              dashboard-v*) PKG=dashboard; TAGVER="${TAG#dashboard-v}" ;;
+              *) echo "::error::Tag '$TAG' does not match <numbering|dashboard>-v<version>. Bare-semver tags no longer publish — use e.g. numbering-v0.4.0."; exit 1 ;;
+            esac
           fi
           case "$PKG" in
             numbering) DIR=packages/numbering; SHIM=jd-numbering-brat ;;
@@ -56,6 +66,7 @@ jobs:
             echo "pkg=$PKG"
             echo "dir=$DIR"
             echo "shim=$SHIM"
+            echo "tagver=$TAGVER"
           } >> "$GITHUB_OUTPUT"
 
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
@@ -70,6 +81,21 @@ jobs:
           npm ci
           npm run build
           test -f main.js
+
+      # For tag pushes, the tag version must match the package manifest so the
+      # published artifacts can never be mislabeled relative to the tag.
+      - name: Verify tag matches manifest version
+        if: steps.t.outputs.tagver != ''
+        env:
+          DIR: ${{ steps.t.outputs.dir }}
+          TAGVER: ${{ steps.t.outputs.tagver }}
+        run: |
+          MAN="$(node -p "require('./${DIR}/manifest.json').version")"
+          if [ "$MAN" != "$TAGVER" ]; then
+            echo "::error::Tag version '$TAGVER' != ${DIR}/manifest.json version '$MAN'. Bump the manifest or fix the tag."
+            exit 1
+          fi
+          echo "Version OK: $MAN"
 
       # Load the deploy key for whichever shim we're publishing to. Only the
       # matching step runs; the key persists in the ssh-agent for later steps.
@@ -91,13 +117,17 @@ jobs:
           SHIM: ${{ steps.t.outputs.shim }}
         run: |
           set -euo pipefail
+          mkdir -p ~/.ssh
           ssh-keyscan github.com >> ~/.ssh/known_hosts 2>/dev/null
+          # The shim repos were created with `main` as their default branch.
           git clone --depth 1 "git@github.com:nelsonlove/${SHIM}.git" shim
           VERSION="$(node -p "require('./${DIR}/manifest.json').version")"
-          # Required artifacts
+          # Drop previously-published artifacts first so files the plugin no
+          # longer ships are removed from the shim (git add -A stages the
+          # deletion). The shim's README.md is left untouched.
+          rm -f shim/main.js shim/manifest.json shim/styles.css shim/versions.json
           cp -f "${DIR}/main.js" shim/main.js
           cp -f "${DIR}/manifest.json" shim/manifest.json
-          # Optional artifacts
           [ -f "${DIR}/styles.css" ] && cp -f "${DIR}/styles.css" shim/styles.css || true
           [ -f "${DIR}/versions.json" ] && cp -f "${DIR}/versions.json" shim/versions.json || true
           cd shim
