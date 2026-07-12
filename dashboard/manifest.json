@@ -1,0 +1,9 @@
+{
+	"id": "jd-dashboard",
+	"name": "Johnny Decimal Dashboard",
+	"version": "0.2.0",
+	"minAppVersion": "1.11.4",
+	"description": "Live JD system awareness — inbox dashboard, drift detection, quick ID navigation, template-driven note creation.",
+	"author": "Nelson Love",
+	"isDesktopOnly": true
+}

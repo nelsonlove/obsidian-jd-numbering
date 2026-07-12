@@ -4,3 +4,7 @@ main.js
 
 # headless test bundle
 test/.suite.out.mjs
+
+# plugin runtime data (written by Obsidian at the plugin folder root)
+/data.json
+/dashboard/data.json
