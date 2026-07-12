@@ -71,3 +71,15 @@ Releases are cut by pushing a tag (`x.y.z`) — see `.github/workflows/release.y
 ## License
 
 MIT
+
+## Also in this repo
+
+The [`dashboard/`](dashboard) directory holds a companion Obsidian plugin,
+**Johnny Decimal Dashboard** (`jd-dashboard`) — inbox dashboard, drift
+detection, and quick ID navigation. It was folded in from the former
+standalone `jd-obsidian` repo (with full history) and is built independently;
+see [`dashboard/README.md`](dashboard/README.md).
+
+> Note: only this root plugin (`jd-numbering`) is installable via BRAT
+> (`nelsonlove/jd-numbering`), since BRAT reads `manifest.json` from the repo
+> root. The dashboard is built/installed from its own directory.

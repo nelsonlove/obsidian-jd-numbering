@@ -210,7 +210,7 @@ surveyed: 2026-03-31
 ## Development
 
 ```sh
-cd ~/repos/jd-obsidian
+cd dashboard   # inside the jd-numbering monorepo
 npm install
 npm run dev     # watch mode — rebuilds on change
 npm run build   # production build

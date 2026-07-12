@@ -14,14 +14,22 @@ concurrency:
   group: build-${{ github.ref }}
   cancel-in-progress: true
 
-# Defense-in-depth: GITHUB_TOKEN gets read-only access. Bump per-job if
-# a future step needs to write (e.g. an auto-release job posting assets).
+# Defense-in-depth: GITHUB_TOKEN gets read-only access.
 permissions:
   contents: read
 
 jobs:
   build:
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # Both plugins in the monorepo: the numbering plugin at the repo
+        # root and the dashboard plugin under dashboard/.
+        package: [".", "dashboard"]
+    defaults:
+      run:
+        working-directory: ${{ matrix.package }}
     steps:
       # SHA-pinned for supply-chain hardening; bump these (and the
       # trailing version comment) when the action ships a release worth
@@ -32,6 +40,7 @@ jobs:
         with:
           node-version: "22"
           cache: "npm"
+          cache-dependency-path: ${{ matrix.package }}/package-lock.json
 
       - run: npm ci
 
