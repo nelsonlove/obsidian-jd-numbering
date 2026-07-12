@@ -1,34 +1,112 @@
-name: Release Obsidian plugin
+name: Publish plugin to its BRAT shim
+
+# Push a per-package tag to build that plugin and mirror its built files
+# (main.js, manifest.json, styles.css, versions.json) into the plugin's thin
+# `-brat` distribution repo, which is what users install via BRAT.
+#
+#   numbering-v1.2.3  ->  packages/numbering  ->  nelsonlove/jd-numbering-brat
+#   dashboard-v1.2.3  ->  packages/dashboard  ->  nelsonlove/jd-dashboard-brat
+#
+# workflow_dispatch is provided for manual re-syncs (no tag needed).
 
 on:
   push:
     tags:
-      - "*"
+      - "numbering-v*"
+      - "dashboard-v*"
+  workflow_dispatch:
+    inputs:
+      package:
+        description: "Package to build and publish"
+        required: true
+        type: choice
+        options: [numbering, dashboard]
 
+# Only read access to THIS repo is needed; the push to the shim repo is
+# authenticated by a per-shim SSH deploy key, not GITHUB_TOKEN.
 permissions:
-  contents: write
+  contents: read
 
 jobs:
-  build:
+  publish:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
 
-      - uses: actions/setup-node@v4
+      # Resolve the package from the tag prefix (or the manual input) without
+      # interpolating untrusted text into the shell body.
+      - name: Resolve target
+        id: t
+        env:
+          EVENT: ${{ github.event_name }}
+          TAG: ${{ github.ref_name }}
+          INPUT_PKG: ${{ inputs.package }}
+        run: |
+          if [ "$EVENT" = "workflow_dispatch" ]; then
+            PKG="$INPUT_PKG"
+          else
+            PKG="${TAG%%-*}"   # strip -vX.Y.Z suffix
+          fi
+          case "$PKG" in
+            numbering) DIR=packages/numbering; SHIM=jd-numbering-brat ;;
+            dashboard) DIR=packages/dashboard; SHIM=jd-dashboard-brat ;;
+            *) echo "::error::Unrecognized package '$PKG' (expected numbering|dashboard)"; exit 1 ;;
+          esac
+          {
+            echo "pkg=$PKG"
+            echo "dir=$DIR"
+            echo "shim=$SHIM"
+          } >> "$GITHUB_OUTPUT"
+
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
-          node-version: "20.x"
+          node-version: "22"
+          cache: "npm"
+          cache-dependency-path: ${{ steps.t.outputs.dir }}/package-lock.json
 
       - name: Build
+        working-directory: ${{ steps.t.outputs.dir }}
         run: |
           npm ci
           npm run build
+          test -f main.js
 
-      - name: Create release
+      # Load the deploy key for whichever shim we're publishing to. Only the
+      # matching step runs; the key persists in the ssh-agent for later steps.
+      - name: Load numbering shim deploy key
+        if: steps.t.outputs.pkg == 'numbering'
+        uses: webfactory/ssh-agent@a6f90b1f127823b31d4d4a8d96047790581349bd # v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.NUMBERING_SHIM_DEPLOY_KEY }}
+
+      - name: Load dashboard shim deploy key
+        if: steps.t.outputs.pkg == 'dashboard'
+        uses: webfactory/ssh-agent@a6f90b1f127823b31d4d4a8d96047790581349bd # v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.DASHBOARD_SHIM_DEPLOY_KEY }}
+
+      - name: Mirror built files to the shim repo
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          tag: ${{ github.ref_name }}
+          DIR: ${{ steps.t.outputs.dir }}
+          SHIM: ${{ steps.t.outputs.shim }}
         run: |
-          gh release create "$tag" \
-            --title="$tag" \
-            --generate-notes \
-            main.js manifest.json styles.css
+          set -euo pipefail
+          ssh-keyscan github.com >> ~/.ssh/known_hosts 2>/dev/null
+          git clone --depth 1 "git@github.com:nelsonlove/${SHIM}.git" shim
+          VERSION="$(node -p "require('./${DIR}/manifest.json').version")"
+          # Required artifacts
+          cp -f "${DIR}/main.js" shim/main.js
+          cp -f "${DIR}/manifest.json" shim/manifest.json
+          # Optional artifacts
+          [ -f "${DIR}/styles.css" ] && cp -f "${DIR}/styles.css" shim/styles.css || true
+          [ -f "${DIR}/versions.json" ] && cp -f "${DIR}/versions.json" shim/versions.json || true
+          cd shim
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add -A
+          if git diff --cached --quiet; then
+            echo "No change in built output for ${SHIM} @ ${VERSION}; nothing to publish."
+            exit 0
+          fi
+          git commit -m "release ${VERSION} (from ${GITHUB_REF_NAME:-manual})"
+          git push origin HEAD:main
