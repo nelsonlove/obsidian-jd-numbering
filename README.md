@@ -47,7 +47,7 @@ Push a per-package tag; CI builds that package and pushes the built files to its
 | `numbering-v1.2.3` | `packages/numbering` | `jd-numbering-brat` |
 | `dashboard-v1.2.3` | `packages/dashboard` | `jd-dashboard-brat` |
 
-See `.github/workflows/release.yml`.
+Full details — the tag rule, the shim/BRAT mechanism, and the manual fallback — are in **[RELEASING.md](RELEASING.md)**.
 
 ## License
 
