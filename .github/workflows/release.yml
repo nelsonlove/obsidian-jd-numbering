@@ -1,23 +1,22 @@
 name: Release
 
-# Push a bare `X.Y.Z` tag (Obsidian convention — no `v` prefix) matching
-# manifest.json to build the plugin and publish a GitHub Release with the built
+# Push a tag to build the plugin and publish a GitHub Release with the built
 # files attached. BRAT reads the root manifest.json for the version, then
 # installs the assets from the Release tagged with that version.
 #
-# workflow_dispatch re-runs the publish for the current manifest version (e.g.
-# if a Release needs regenerating).
+# The tag MUST be a bare `X.Y.Z` (Obsidian convention — no `v` prefix) that
+# equals manifest.json. The trigger is deliberately broad (`*`) so a mistyped
+# tag (e.g. `v0.3.1`) still starts the job and FAILS LOUDLY in "Resolve version"
+# rather than silently doing nothing.
+#
+# workflow_dispatch re-publishes the current manifest version (e.g. to
+# regenerate a missing Release), anchored to the checked-out commit.
 
 on:
   push:
     tags:
-      - "[0-9]+.[0-9]+.[0-9]+"
+      - "*"
   workflow_dispatch:
-    inputs:
-      version:
-        description: "Version to (re)publish (defaults to manifest.json)"
-        required: false
-        type: string
 
 # The Release is created with this repo's own GITHUB_TOKEN.
 permissions:
@@ -35,38 +34,42 @@ jobs:
           cache: "npm"
           cache-dependency-path: package-lock.json
 
-      - name: Build
-        run: |
-          npm ci
-          npm run build
-          test -f main.js
-
-      # Resolve the version to publish and, for tag pushes, verify it matches
-      # the manifest so a Release can never be mislabeled relative to its tag.
+      # The published version is ALWAYS manifest.json — never operator input —
+      # so a Release can't be mislabeled relative to the code it ships. On a tag
+      # push we additionally require the tag to be a bare semver equal to the
+      # manifest, or fail loudly.
       - name: Resolve version
         id: v
         env:
           EVENT: ${{ github.event_name }}
           TAG: ${{ github.ref_name }}
-          INPUT: ${{ inputs.version }}
         run: |
           MAN="$(node -p "require('./manifest.json').version")"
           if [ "$EVENT" = "push" ]; then
+            if ! printf '%s' "$TAG" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$'; then
+              echo "::error::Tag '$TAG' is not a bare X.Y.Z version (no 'v' prefix). Retag, e.g. '$MAN'."
+              exit 1
+            fi
             if [ "$TAG" != "$MAN" ]; then
               echo "::error::Tag '$TAG' != manifest.json version '$MAN'. Bump the manifest or fix the tag."
               exit 1
             fi
-            VERSION="$TAG"
-          else
-            VERSION="${INPUT:-$MAN}"
           fi
-          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
-          echo "Publishing $VERSION"
+          echo "version=$MAN" >> "$GITHUB_OUTPUT"
+          echo "Publishing $MAN"
+
+      - name: Build
+        run: |
+          npm ci
+          npm run build
+          test -f main.js
+          npm test
 
       - name: Publish Release
         env:
           GH_TOKEN: ${{ github.token }}
           VERSION: ${{ steps.v.outputs.version }}
+          SHA: ${{ github.sha }}
         run: |
           set -euo pipefail
           ASSETS="main.js manifest.json"
@@ -75,7 +78,10 @@ jobs:
           if gh release view "$VERSION" >/dev/null 2>&1; then
             gh release upload "$VERSION" $ASSETS --clobber
           else
+            # --target anchors the auto-created tag to the checked-out commit
+            # (matters for a manual dispatch, where no tag was pushed).
             gh release create "$VERSION" $ASSETS \
+              --target "$SHA" \
               --title "$VERSION" \
               --notes "Automated release for JD Numbering $VERSION."
           fi

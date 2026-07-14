@@ -30,18 +30,22 @@ workflow uses only this repo's `GITHUB_TOKEN` with `contents: write`.
 
 ## Rules & gotchas
 
-- **Tag must be bare `X.Y.Z`** (no `v`), matching the manifest version, or the
-  build step fails on purpose.
+- **Tag must be bare `X.Y.Z`** (no `v`), matching the manifest version. The
+  trigger is broad, so a mistyped tag (e.g. `v0.3.1`) still starts the run and
+  **fails loudly** in "Resolve version" rather than silently doing nothing.
+- The published version always comes from `manifest.json`, never from operator
+  input, so a Release can't be mislabeled relative to the code it ships.
 - A tag without a matching Release produces BRAT's
   `Error: No releases found in this repository.` — the Release is what BRAT
   actually installs from, so let the workflow finish.
 
 ## Manual fallback
 
-Re-run the release for the current manifest version at any time:
+Re-publish the current manifest version at any time (regenerates the Release,
+anchored to the branch's HEAD):
 
 ```bash
-gh workflow run release.yml -f version=0.3.1
+gh workflow run release.yml
 ```
 
 ## History
