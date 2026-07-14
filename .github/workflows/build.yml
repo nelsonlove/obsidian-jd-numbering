@@ -21,14 +21,6 @@ permissions:
 jobs:
   build:
     runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        # Both plugins in the monorepo, each self-contained under packages/.
-        package: ["packages/numbering", "packages/dashboard"]
-    defaults:
-      run:
-        working-directory: ${{ matrix.package }}
     steps:
       # SHA-pinned for supply-chain hardening; bump these (and the
       # trailing version comment) when the action ships a release worth
@@ -39,7 +31,7 @@ jobs:
         with:
           node-version: "22"
           cache: "npm"
-          cache-dependency-path: ${{ matrix.package }}/package-lock.json
+          cache-dependency-path: package-lock.json
 
       - run: npm ci
 
@@ -49,3 +41,6 @@ jobs:
 
       - name: Verify main.js was built
         run: test -f main.js
+
+      - name: Headless test suite
+        run: npm test
