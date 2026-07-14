@@ -3,8 +3,7 @@ main.js
 *.map
 
 # headless test bundle
-**/test/.suite.out.mjs
+test/.suite.out.mjs
 
-# plugin runtime data (written by Obsidian at each plugin's folder root)
-/packages/numbering/data.json
-/packages/dashboard/data.json
+# plugin runtime data (written by Obsidian at the plugin folder root)
+data.json

@@ -1,142 +1,87 @@
-name: Publish plugin to its BRAT shim
+name: Release
 
-# Push a per-package tag to build that plugin and mirror its built files
-# (main.js, manifest.json, styles.css, versions.json) into the plugin's thin
-# `-brat` distribution repo, which is what users install via BRAT.
+# Push a tag to build the plugin and publish a GitHub Release with the built
+# files attached. BRAT reads the root manifest.json for the version, then
+# installs the assets from the Release tagged with that version.
 #
-#   numbering-v1.2.3  ->  packages/numbering  ->  nelsonlove/jd-numbering-brat
-#   dashboard-v1.2.3  ->  packages/dashboard  ->  nelsonlove/jd-dashboard-brat
-#
-# The tag's version (the part after `-v`) must equal the package's
-# manifest.json version, or the run fails.
-#
-# The trigger is deliberately broad (`*`): an unrecognized tag (e.g. a bare
-# semver `0.4.0`) still starts the job and fails LOUDLY in "Resolve target"
+# The tag MUST be a bare `X.Y.Z` (Obsidian convention — no `v` prefix) that
+# equals manifest.json. The trigger is deliberately broad (`*`) so a mistyped
+# tag (e.g. `v0.3.1`) still starts the job and FAILS LOUDLY in "Resolve version"
 # rather than silently doing nothing.
 #
-# workflow_dispatch is provided for manual re-syncs (no version check).
+# workflow_dispatch re-publishes the current manifest version (e.g. to
+# regenerate a missing Release), anchored to the checked-out commit.
 
 on:
   push:
     tags:
       - "*"
   workflow_dispatch:
-    inputs:
-      package:
-        description: "Package to build and publish"
-        required: true
-        type: choice
-        options: [numbering, dashboard]
 
-# Only read access to THIS repo is needed; the push to the shim repo is
-# authenticated by a per-shim SSH deploy key, not GITHUB_TOKEN.
+# The Release is created with this repo's own GITHUB_TOKEN.
 permissions:
-  contents: read
+  contents: write
 
 jobs:
-  publish:
+  release:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
-
-      # Resolve the package + expected version without interpolating untrusted
-      # text into the shell body. Unrecognized tags exit non-zero here.
-      - name: Resolve target
-        id: t
-        env:
-          EVENT: ${{ github.event_name }}
-          TAG: ${{ github.ref_name }}
-          INPUT_PKG: ${{ inputs.package }}
-        run: |
-          if [ "$EVENT" = "workflow_dispatch" ]; then
-            PKG="$INPUT_PKG"; TAGVER=""
-          else
-            case "$TAG" in
-              numbering-v*) PKG=numbering; TAGVER="${TAG#numbering-v}" ;;
-              dashboard-v*) PKG=dashboard; TAGVER="${TAG#dashboard-v}" ;;
-              *) echo "::error::Tag '$TAG' does not match <numbering|dashboard>-v<version>. Bare-semver tags no longer publish — use e.g. numbering-v0.4.0."; exit 1 ;;
-            esac
-          fi
-          case "$PKG" in
-            numbering) DIR=packages/numbering; SHIM=jd-numbering-brat ;;
-            dashboard) DIR=packages/dashboard; SHIM=jd-dashboard-brat ;;
-            *) echo "::error::Unrecognized package '$PKG' (expected numbering|dashboard)"; exit 1 ;;
-          esac
-          {
-            echo "pkg=$PKG"
-            echo "dir=$DIR"
-            echo "shim=$SHIM"
-            echo "tagver=$TAGVER"
-          } >> "$GITHUB_OUTPUT"
 
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: "22"
           cache: "npm"
-          cache-dependency-path: ${{ steps.t.outputs.dir }}/package-lock.json
+          cache-dependency-path: package-lock.json
+
+      # The published version is ALWAYS manifest.json — never operator input —
+      # so a Release can't be mislabeled relative to the code it ships. On a tag
+      # push we additionally require the tag to be a bare semver equal to the
+      # manifest, or fail loudly.
+      - name: Resolve version
+        id: v
+        env:
+          EVENT: ${{ github.event_name }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          MAN="$(node -p "require('./manifest.json').version")"
+          if [ "$EVENT" = "push" ]; then
+            if ! printf '%s' "$TAG" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$'; then
+              echo "::error::Tag '$TAG' is not a bare X.Y.Z version (no 'v' prefix). Retag, e.g. '$MAN'."
+              exit 1
+            fi
+            if [ "$TAG" != "$MAN" ]; then
+              echo "::error::Tag '$TAG' != manifest.json version '$MAN'. Bump the manifest or fix the tag."
+              exit 1
+            fi
+          fi
+          echo "version=$MAN" >> "$GITHUB_OUTPUT"
+          echo "Publishing $MAN"
 
       - name: Build
-        working-directory: ${{ steps.t.outputs.dir }}
         run: |
           npm ci
           npm run build
           test -f main.js
+          npm test
 
-      # For tag pushes, the tag version must match the package manifest so the
-      # published artifacts can never be mislabeled relative to the tag.
-      - name: Verify tag matches manifest version
-        if: steps.t.outputs.tagver != ''
+      - name: Publish Release
         env:
-          DIR: ${{ steps.t.outputs.dir }}
-          TAGVER: ${{ steps.t.outputs.tagver }}
-        run: |
-          MAN="$(node -p "require('./${DIR}/manifest.json').version")"
-          if [ "$MAN" != "$TAGVER" ]; then
-            echo "::error::Tag version '$TAGVER' != ${DIR}/manifest.json version '$MAN'. Bump the manifest or fix the tag."
-            exit 1
-          fi
-          echo "Version OK: $MAN"
-
-      # Load the deploy key for whichever shim we're publishing to. Only the
-      # matching step runs; the key persists in the ssh-agent for later steps.
-      - name: Load numbering shim deploy key
-        if: steps.t.outputs.pkg == 'numbering'
-        uses: webfactory/ssh-agent@a6f90b1f127823b31d4d4a8d96047790581349bd # v0.9.0
-        with:
-          ssh-private-key: ${{ secrets.NUMBERING_SHIM_DEPLOY_KEY }}
-
-      - name: Load dashboard shim deploy key
-        if: steps.t.outputs.pkg == 'dashboard'
-        uses: webfactory/ssh-agent@a6f90b1f127823b31d4d4a8d96047790581349bd # v0.9.0
-        with:
-          ssh-private-key: ${{ secrets.DASHBOARD_SHIM_DEPLOY_KEY }}
-
-      - name: Mirror built files to the shim repo
-        env:
-          DIR: ${{ steps.t.outputs.dir }}
-          SHIM: ${{ steps.t.outputs.shim }}
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.v.outputs.version }}
+          SHA: ${{ github.sha }}
         run: |
           set -euo pipefail
-          mkdir -p ~/.ssh
-          ssh-keyscan github.com >> ~/.ssh/known_hosts 2>/dev/null
-          # The shim repos were created with `main` as their default branch.
-          git clone --depth 1 "git@github.com:nelsonlove/${SHIM}.git" shim
-          VERSION="$(node -p "require('./${DIR}/manifest.json').version")"
-          # Drop previously-published artifacts first so files the plugin no
-          # longer ships are removed from the shim (git add -A stages the
-          # deletion). The shim's README.md is left untouched.
-          rm -f shim/main.js shim/manifest.json shim/styles.css shim/versions.json
-          cp -f "${DIR}/main.js" shim/main.js
-          cp -f "${DIR}/manifest.json" shim/manifest.json
-          [ -f "${DIR}/styles.css" ] && cp -f "${DIR}/styles.css" shim/styles.css || true
-          [ -f "${DIR}/versions.json" ] && cp -f "${DIR}/versions.json" shim/versions.json || true
-          cd shim
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add -A
-          if git diff --cached --quiet; then
-            echo "No change in built output for ${SHIM} @ ${VERSION}; nothing to publish."
-            exit 0
+          ASSETS="main.js manifest.json"
+          [ -f styles.css ] && ASSETS="$ASSETS styles.css"
+          [ -f versions.json ] && ASSETS="$ASSETS versions.json"
+          if gh release view "$VERSION" >/dev/null 2>&1; then
+            gh release upload "$VERSION" $ASSETS --clobber
+          else
+            # --target anchors the auto-created tag to the checked-out commit
+            # (matters for a manual dispatch, where no tag was pushed).
+            gh release create "$VERSION" $ASSETS \
+              --target "$SHA" \
+              --title "$VERSION" \
+              --notes "Automated release for JD Numbering $VERSION."
           fi
-          git commit -m "release ${VERSION} (from ${GITHUB_REF_NAME:-manual})"
-          git push origin HEAD:main
