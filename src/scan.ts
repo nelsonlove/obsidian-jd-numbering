@@ -4,16 +4,15 @@ import {
 	ParsedId,
 	parseJdId,
 	idTokenFromName,
+	canonicalFolderNoteId,
 	areaOfCategory,
 } from "./jd";
 
 export interface JdNote {
 	file: TFile;
-	/** Value of the `jd-id` frontmatter field, if present. */
-	frontId: string | null;
-	/** Parsed frontmatter id, if valid. */
+	/** Canonical parsed id, derived from the filename + note-kind (filename-canonical). */
 	parsed: ParsedId | null;
-	/** The leading id token of the filename (may differ from frontId). */
+	/** The leading id token of the filename. */
 	nameId: string;
 	title: string;
 	/** True when the note carries a `system/redirect` tag (a moved-note stub). */
@@ -74,18 +73,50 @@ export function discoverFolders(app: App): FolderMaps {
 	return { categoryFolders, areaFolders };
 }
 
+/**
+ * Derive a note's canonical parsed id from its filename + folder structure
+ * (filename-canonical). Mirrors @vault-mcp/core deriveJdIdFromPath and the
+ * vault's `jd-id vs filename.base` classifier:
+ *   - area folder note      "A0-A9 Title"      -> "A0-A9"
+ *   - category folder note  "AC Title"         -> "AC.00"
+ *   - id note               "AC.YY Title"      -> "AC.YY"
+ *   - expanded / fractal    "NNNNN[.YY] Title" -> that id (expanded areas/cats only)
+ * A bare "AC" / "A0-A9" token on a note that is NOT a genuine area/category
+ * folder note (per classifyFolderNote) is a content folder ("04 CD Player"),
+ * not a JD id -> null.
+ */
+export function deriveParsedId(
+	basename: string,
+	parentPath: string,
+	parentName: string,
+	maps: FolderMaps,
+	cfg: JdConfig
+): ParsedId | null {
+	const isFolderNote = basename === parentName;
+	const nameId = idTokenFromName(basename);
+	const kind = classifyFolderNote(isFolderNote, parentPath, maps);
+	if (kind === "area") return parseJdId(nameId, cfg); // "00-09"
+	if (kind === "category") {
+		const raw = canonicalFolderNoteId(nameId, cfg); // "04" -> "04.00"
+		return raw ? parseJdId(raw, cfg) : null;
+	}
+	// Not an area/category folder note: only a content-id-shaped name token
+	// (AC.YY / NNNNN / NNNNN.YY) is a JD id. A bare "AC" / "A0-A9" here is a
+	// content folder, not category/area.
+	const p = parseJdId(nameId, cfg);
+	return p && p.kind !== "area" && p.kind !== "category" ? p : null;
+}
+
 /** Build the JdNote view of a single file. */
-export function buildNote(app: App, file: TFile, cfg: JdConfig): JdNote {
+export function buildNote(app: App, file: TFile, cfg: JdConfig, maps: FolderMaps): JdNote {
 	const cache = app.metadataCache.getFileCache(file);
 	const fm = cache?.frontmatter;
-	const frontId = fm && fm["jd-id"] != null ? String(fm["jd-id"]) : null;
-	const parsed = frontId ? parseJdId(frontId, cfg) : null;
 	const tags = tagsOf(app, file);
 	const parentName = file.parent ? file.parent.name : "";
+	const parentPath = file.parent ? file.parent.path : "";
 	return {
 		file,
-		frontId,
-		parsed,
+		parsed: deriveParsedId(file.basename, parentPath, parentName, maps, cfg),
 		nameId: idTokenFromName(file.basename),
 		title: (fm && typeof fm.title === "string" && fm.title) || file.basename,
 		isRedirect: tags.includes("system/redirect"),
@@ -95,7 +126,7 @@ export function buildNote(app: App, file: TFile, cfg: JdConfig): JdNote {
 
 export function scanVault(app: App, cfg: JdConfig): VaultScan {
 	const folders = discoverFolders(app);
-	const notes = app.vault.getMarkdownFiles().map((f) => buildNote(app, f, cfg));
+	const notes = app.vault.getMarkdownFiles().map((f) => buildNote(app, f, cfg, folders));
 	return { notes, ...folders };
 }
 

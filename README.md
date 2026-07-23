@@ -4,18 +4,18 @@ A small, focused [Johnny Decimal](https://johnnydecimal.com/) helper for Obsidia
 
 | Command | What it does |
 | --- | --- |
-| **JD: Assign next number** | Finds the next free ID for a category (index-first, no collisions), sets the `jd-id` frontmatter, and refiles the active note to `<jd-id> <title>.md`. Shows a before → after confirmation first. |
-| **JD: Refile active note to match its jd-id** | Renames + moves the active note so its filename and folder match its `jd-id`. Can leave a `system/redirect` stub at the old path. |
-| **JD: Lint vault** | Read-only scan → a report note. Flags duplicate IDs, malformed IDs, filename ↔ frontmatter ↔ folder mismatches, missing IDs, and naming-hygiene issues. |
+| **JD: Assign next number** | Finds the next free ID for a category (index-first, no collisions) and renames the active note to `<jd-id> <title>.md`, refiling it into the right folder. Shows a before → after confirmation first. |
+| **JD: Refile active note to match its ID** | Renames + moves the active note so its filename and folder match the ID in its filename. Can leave a `system/redirect` stub at the old path. |
+| **JD: Lint vault** | Read-only scan → a report note. Flags duplicate IDs, malformed filename IDs, folder-placement mismatches, and naming-hygiene issues. |
 | **JD: Refresh index** | Regenerates a master JDex index note (area → category → ID). |
 
 ## Conventions it assumes
 
 - **Filenames** are `<jd-id> <title>.md` (e.g. `06.11 Tailscale.md`).
 - **Folders** are `XX-YY Area` / `XX Category`.
-- **`jd-id`** lives in frontmatter as a **quoted string** (`jd-id: "06.11"`) so leading zeros survive.
+- **The ID is the filename's leading token** (`06.11`), derived per note-kind (area/category folder notes use their `A0-A9` / `AC.00` form). It is **not** stored in frontmatter.
 - **Standard zeros** `.00`–`.09` are reserved; content IDs start at `.10`.
-- Frontmatter is treated as canonical (source of truth), not the filesystem.
+- The **filename is canonical** (the source of truth), not a frontmatter property.
 
 ### Expansion-aware
 

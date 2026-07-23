@@ -33,6 +33,14 @@ export function renderIndex(app: App, cfg: JdConfig, scan?: VaultScan): string {
 			catTitle.set(id.category, n.title);
 			continue;
 		}
+		// Category home (standard-zero "AC.00" — the JDex / category folder note):
+		// a title source, not a content row. Under filename-canonical a category
+		// folder note derives id "AC.00" (kind "id"), so catch it explicitly here
+		// rather than via the kind === "category" branch above.
+		if (id.kind === "id" && id.raw.endsWith(".00")) {
+			catTitle.set(id.category, n.title);
+			continue;
+		}
 		// content / expanded / fractal ids
 		const cats = tree.get(id.area) ?? new Map<string, Row[]>();
 		const rows = cats.get(id.category) ?? [];
