@@ -95,10 +95,10 @@ export function isExpandedCategory(cat: string, cfg: JdConfig): boolean {
 }
 
 /**
- * The canonical `jd-id` a folder note should carry, derived from its filename
- * id-token. Folder notes have a deliberate asymmetry between name and prop:
- *   - area folder note      "A0-A9 Title"  -> jd-id "A0-A9"     (e.g. 00-09)
- *   - category folder note  "AC Title"     -> jd-id "AC.00"     (standard-zero home)
+ * The canonical JD id of a folder note, derived from its filename id-token.
+ * Folder notes have a deliberate asymmetry between the name token and the id:
+ *   - area folder note      "A0-A9 Title"  -> id "A0-A9"     (e.g. 00-09)
+ *   - category folder note  "AC Title"     -> id "AC.00"     (standard-zero home)
  * Returns null when the token is not an area/category id (i.e. not a folder-note
  * shape — e.g. an "AC.YY" content id or a 5-digit expanded item).
  */

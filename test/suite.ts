@@ -1,7 +1,7 @@
 // Headless unit tests for the folder-note conventions. Run via `npm test`
 // (test/run.mjs bundles this with a stubbed `obsidian` and executes it).
-import { canonicalFolderNoteId, parseJdId, DEFAULT_CONFIG } from "../src/jd";
-import { classifyFolderNote, FolderMaps, JdNote } from "../src/scan";
+import { canonicalFolderNoteId, DEFAULT_CONFIG } from "../src/jd";
+import { classifyFolderNote, deriveParsedId, FolderMaps, JdNote } from "../src/scan";
 import { checkNote } from "../src/lint";
 
 const cfg = DEFAULT_CONFIG;
@@ -43,12 +43,23 @@ eq(
 	"deep content folder note -> null"
 );
 
+// --- deriveParsedId (filename-canonical) -----------------------------------
+const rawOf = (basename: string, parentPath: string, parentName: string): string | null =>
+	deriveParsedId(basename, parentPath, parentName, maps, cfg)?.raw ?? null;
+
+eq(rawOf("00-09 System", "00-09 System", "00-09 System"), "00-09", "area folder note -> A0-A9");
+eq(rawOf("00 System management", "00-09 System/00 System management", "00 System management"), "00.00", "category folder note -> AC.00");
+eq(rawOf("03.11 Foo", "00-09 System/03 Obsidian", "03 Obsidian"), "03.11", "content note -> AC.YY");
+eq(rawOf("03.05 Agents", "00-09 System/03 Obsidian/03.05 Agents", "03.05 Agents"), "03.05", "id-level folder note -> AC.YY (not AC.00)");
+eq(rawOf("04 CD Player", "70-79 Hobbies & media/75 Games/X/CAOS commands/04 CD Player", "04 CD Player"), null, "deep content folder note -> not a JD id");
+eq(rawOf("random thoughts", "10-19 Personal", "10-19 Personal"), null, "non-JD note -> null");
+
 // --- checkNote -------------------------------------------------------------
 function fakeNote(o: {
 	basename: string;
 	parentPath: string;
 	parentName: string;
-	frontId: string | null;
+	isRedirect?: boolean;
 }): JdNote {
 	return {
 		file: {
@@ -57,61 +68,55 @@ function fakeNote(o: {
 			name: `${o.basename}.md`,
 			parent: { path: o.parentPath, name: o.parentName },
 		},
-		frontId: o.frontId,
-		parsed: o.frontId ? parseJdId(o.frontId, cfg) : null,
+		parsed: deriveParsedId(o.basename, o.parentPath, o.parentName, maps, cfg),
 		nameId: o.basename.split(" ")[0],
 		title: o.basename,
-		isRedirect: false,
+		isRedirect: o.isRedirect ?? false,
 		isFolderNote: o.basename === o.parentName,
 	} as unknown as JdNote;
 }
 const codes = (n: JdNote): string[] => checkNote(n, maps, cfg).map((f) => f.code);
 
-// category folder note with the correct AC.00 prop -> no folder-note findings
+// A correctly-placed category folder note is clean.
 eq(
-	codes(fakeNote({ basename: "00 System management", parentPath: "00-09 System/00 System management", parentName: "00 System management", frontId: "00.00" })).includes("folder-note-id-mismatch"),
-	false,
-	"correct category folder note: no mismatch"
+	codes(fakeNote({ basename: "00 System management", parentPath: "00-09 System/00 System management", parentName: "00 System management" })).length,
+	0,
+	"correct category folder note: no findings"
 );
 
-// category folder note whose prop disagrees (03 Obsidian carrying 02.00)
+// A correctly-placed area folder note is clean.
 eq(
-	codes(fakeNote({ basename: "03 Obsidian", parentPath: "00-09 System/03 Obsidian", parentName: "03 Obsidian", frontId: "02.00" })).includes("folder-note-id-mismatch"),
+	codes(fakeNote({ basename: "00-09 System", parentPath: "00-09 System", parentName: "00-09 System" })).length,
+	0,
+	"correct area folder note: no findings"
+);
+
+// A content note in the right category folder is clean.
+eq(
+	codes(fakeNote({ basename: "03.11 Foo", parentPath: "00-09 System/03 Obsidian", parentName: "03 Obsidian" })).length,
+	0,
+	"content note in correct folder: no findings"
+);
+
+// A content note under the wrong category folder -> folder-mismatch.
+eq(
+	codes(fakeNote({ basename: "03.11 Foo", parentPath: "00-09 System/00 System management", parentName: "00 System management" })).includes("folder-mismatch"),
 	true,
-	"category folder note wrong prop -> folder-note-id-mismatch"
+	"content note in wrong folder -> folder-mismatch"
 );
 
-// category folder note missing its prop entirely
-{
-	const c = codes(fakeNote({ basename: "00 System management", parentPath: "00-09 System/00 System management", parentName: "00 System management", frontId: null }));
-	eq(c.includes("missing-folder-note-id"), true, "category folder note no prop -> missing-folder-note-id");
-	eq(c.includes("missing-frontmatter-id"), false, "category folder note: not double-flagged");
-}
-
-// area folder note correct / missing
+// A filename that looks like an id but doesn't parse -> malformed-id.
 eq(
-	codes(fakeNote({ basename: "00-09 System", parentPath: "00-09 System", parentName: "00-09 System", frontId: "00-09" })).some((c) => c.startsWith("missing-folder-note") || c === "folder-note-id-mismatch"),
-	false,
-	"correct area folder note: clean"
-);
-eq(
-	codes(fakeNote({ basename: "00-09 System", parentPath: "00-09 System", parentName: "00-09 System", frontId: null })).includes("missing-folder-note-id"),
+	codes(fakeNote({ basename: "03.2 Foo", parentPath: "00-09 System/03 Obsidian", parentName: "03 Obsidian" })).includes("malformed-id"),
 	true,
-	"area folder note no prop -> missing-folder-note-id"
+	"filename looks like an id but is invalid -> malformed-id"
 );
 
-// content note filename/prop mismatch still works, and isn't treated as a folder note
-{
-	const c = codes(fakeNote({ basename: "01.13 Apple Notes", parentPath: "00-09 System/01 Capture & triage", parentName: "01 Capture & triage", frontId: "01.12" }));
-	eq(c.includes("filename-mismatch"), true, "content note filename/prop mismatch still flagged");
-	eq(c.includes("folder-note-id-mismatch"), false, "content note not treated as folder note");
-}
-
-// deep content folder note (04 CD Player) must NOT be flagged as a JD category
+// A deep content folder note (04 CD Player) must NOT be flagged as a JD id.
 eq(
-	codes(fakeNote({ basename: "04 CD Player", parentPath: "70-79 Hobbies & media/75 Games/X/CAOS commands/04 CD Player", parentName: "04 CD Player", frontId: null })).some((c) => c.startsWith("missing-")),
-	false,
-	"deep content folder note: no missing-id warnings"
+	codes(fakeNote({ basename: "04 CD Player", parentPath: "70-79 Hobbies & media/75 Games/X/CAOS commands/04 CD Player", parentName: "04 CD Player" })).length,
+	0,
+	"deep content folder note: no findings"
 );
 
 console.log(`\n${failures === 0 ? "PASS" : "FAIL"} — ${failures} failure(s)`);

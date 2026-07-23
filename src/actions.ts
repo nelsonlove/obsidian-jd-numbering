@@ -10,13 +10,6 @@ import {
 } from "./scan";
 import { CategoryChoice, CategorySuggestModal, ConfirmModal } from "./modals";
 
-/** Set the `jd-id` frontmatter, forcing a quoted string to preserve leading zeros. */
-async function setJdId(app: App, file: TFile, id: string): Promise<void> {
-	await app.fileManager.processFrontMatter(file, (fm) => {
-		fm["jd-id"] = id;
-	});
-}
-
 /** Compute the next free id in a category (normal or expanded). */
 export function nextId(scan: VaultScan, cfg: JdConfig, category: string): string | null {
 	if (isExpandedCategory(category, cfg)) {
@@ -86,7 +79,8 @@ export async function assignNextNumber(app: App, cfg: JdConfig): Promise<void> {
 			`Assign ${id}`,
 			async () => {
 				try {
-					await setJdId(app, file, id);
+					// Filename-canonical: assigning an id means renaming the file so
+					// its prefix (and folder) carry the id — no frontmatter is written.
 					if (dest !== file.path) await app.fileManager.renameFile(file, dest);
 					new Notice(`JD: assigned ${id}`);
 				} catch (e) {
@@ -114,7 +108,7 @@ export async function refileToMatchId(app: App, cfg: JdConfig, leaveRedirect: bo
 	const scan = scanVault(app, cfg);
 	const note = scan.notes.find((n) => n.file.path === file.path);
 	if (!note || !note.parsed) {
-		new Notice("JD: this note has no valid jd-id.");
+		new Notice("JD: this note has no valid JD id in its filename.");
 		return;
 	}
 	const id = note.parsed;
@@ -136,7 +130,7 @@ export async function refileToMatchId(app: App, cfg: JdConfig, leaveRedirect: bo
 	const oldPath = file.path;
 	new ConfirmModal(
 		app,
-		"Refile to match jd-id",
+		"Refile to match id",
 		[`id: ${id.raw}`, `From: ${oldPath}`, `To:   ${dest}`, leaveRedirect ? "Leaves a redirect stub." : "No stub."],
 		"Refile",
 		async () => {
@@ -144,7 +138,7 @@ export async function refileToMatchId(app: App, cfg: JdConfig, leaveRedirect: bo
 				await app.fileManager.renameFile(file, dest);
 				if (leaveRedirect) {
 					const stub =
-						`---\njd-id: "${id.raw}"\ntags:\n  - system/redirect\n---\n\nMoved to [[${dest}|${id.raw} ${title}]].\n`;
+						`---\ntags:\n  - system/redirect\n---\n\nMoved to [[${dest}|${id.raw} ${title}]].\n`;
 					await app.vault.create(oldPath, stub);
 				}
 				new Notice(`JD: refiled ${id.raw}`);

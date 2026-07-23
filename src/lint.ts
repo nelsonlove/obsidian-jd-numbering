@@ -1,5 +1,5 @@
 import { App, TFile } from "obsidian";
-import { JdConfig, isStandardZero, canonicalFolderNoteId } from "./jd";
+import { JdConfig, isStandardZero } from "./jd";
 import {
 	FolderMaps,
 	JdNote,
@@ -8,7 +8,6 @@ import {
 	buildNote,
 	discoverFolders,
 	expectedFolder,
-	classifyFolderNote,
 } from "./scan";
 
 export type LintLevel = "error" | "warn";
@@ -34,42 +33,16 @@ export function checkNote(note: JdNote, maps: FolderMaps, cfg: JdConfig): LintFi
 	const add = (level: LintLevel, code: string, message: string) =>
 		out.push({ level, code, path, message });
 
-	// Malformed jd-id present but unparseable.
-	if (note.frontId && !note.parsed) {
-		add("error", "malformed-id", `jd-id "${note.frontId}" is not a valid JD identifier`);
-		return out;
-	}
-
-	// Area/category folder notes carry their id per convention (area -> "A0-A9",
-	// category -> "AC.00"). Runs before the `!parsed` early-return below so that a
-	// folder note missing its id (parsed === null) is still caught here.
-	const folderNoteKind = classifyFolderNote(
-		note.isFolderNote,
-		note.file.parent ? note.file.parent.path : "",
-		maps
-	);
-	if (folderNoteKind) {
-		const want = canonicalFolderNoteId(note.nameId, cfg);
-		if (want && !note.frontId) {
-			add("warn", "missing-folder-note-id", `${folderNoteKind} folder note should carry jd-id "${want}" but has none`);
-		} else if (want && note.frontId && note.frontId !== want) {
-			add("warn", "folder-note-id-mismatch", `${folderNoteKind} folder note jd-id "${note.frontId}" should be "${want}"`);
-		}
-	}
-
-	// Filename that looks like an id but has no frontmatter id.
+	// Filename looks like a JD id but doesn't derive a valid one (filename-
+	// canonical). Folder notes are exempt: a content folder note like
+	// "04 CD Player" legitimately starts with digits without being a JD id.
 	const nameLooksLikeId = /^[0-9]/.test(note.file.basename);
-	if (nameLooksLikeId && !note.frontId && !note.isFolderNote) {
-		add("warn", "missing-frontmatter-id", `filename starts with "${note.nameId}" but the note has no jd-id`);
+	if (nameLooksLikeId && !note.parsed && !note.isFolderNote) {
+		add("warn", "malformed-id", `filename id "${note.nameId}" is not a valid JD identifier`);
 	}
 
 	if (!note.parsed) return out;
 	const id = note.parsed;
-
-	// Filename prefix should equal the jd-id (folder notes use area/category form).
-	if (!note.isFolderNote && note.nameId !== id.raw) {
-		add("warn", "filename-mismatch", `filename id "${note.nameId}" != jd-id "${id.raw}"`);
-	}
 
 	// Folder placement: the note's category folder should match the id's category.
 	const want = expectedFolder(maps, id);
@@ -103,13 +76,15 @@ export function lintVault(app: App, cfg: JdConfig, scan?: VaultScan): LintFindin
 	const s = scan ?? scanVault(app, cfg);
 	const findings: LintFinding[] = [];
 
-	// Duplicate jd-id (ignoring redirect stubs, which intentionally reuse an id).
+	// Duplicate id (ignoring redirect stubs, which intentionally reuse an id).
+	// The id is the one derived from each note's filename (filename-canonical).
 	const byId = new Map<string, string[]>();
 	for (const n of s.notes) {
-		if (!n.frontId || n.isRedirect || !n.parsed) continue;
-		const arr = byId.get(n.frontId) ?? [];
+		if (n.isRedirect || !n.parsed) continue;
+		const key = n.parsed.raw;
+		const arr = byId.get(key) ?? [];
 		arr.push(n.file.path);
-		byId.set(n.frontId, arr);
+		byId.set(key, arr);
 	}
 	for (const [id, paths] of byId) {
 		if (paths.length > 1) {
@@ -118,7 +93,7 @@ export function lintVault(app: App, cfg: JdConfig, scan?: VaultScan): LintFindin
 					level: "error",
 					code: "duplicate-id",
 					path: p,
-					message: `jd-id "${id}" is used by ${paths.length} notes`,
+					message: `id "${id}" is used by ${paths.length} notes`,
 				});
 		}
 	}
@@ -135,7 +110,7 @@ export function lintVault(app: App, cfg: JdConfig, scan?: VaultScan): LintFindin
 /** On-the-fly lint of a single note (no duplicate detection). */
 export function lintNote(app: App, cfg: JdConfig, file: TFile): LintFinding[] {
 	const maps = discoverFolders(app);
-	return checkNote(buildNote(app, file, cfg), maps, cfg);
+	return checkNote(buildNote(app, file, cfg, maps), maps, cfg);
 }
 
 export function renderReport(findings: LintFinding[], cfg: JdConfig): string {
