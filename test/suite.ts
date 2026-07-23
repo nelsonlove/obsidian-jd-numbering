@@ -1,8 +1,9 @@
 // Headless unit tests for the folder-note conventions. Run via `npm test`
 // (test/run.mjs bundles this with a stubbed `obsidian` and executes it).
 import { canonicalFolderNoteId, DEFAULT_CONFIG } from "../src/jd";
-import { classifyFolderNote, deriveParsedId, FolderMaps, JdNote } from "../src/scan";
+import { classifyFolderNote, deriveParsedId, FolderMaps, JdNote, VaultScan } from "../src/scan";
 import { checkNote } from "../src/lint";
+import { renderIndex } from "../src/indexNote";
 
 const cfg = DEFAULT_CONFIG;
 let failures = 0;
@@ -32,6 +33,7 @@ const maps: FolderMaps = {
 	categoryFolders: new Map([
 		["00", "00-09 System/00 System management"],
 		["03", "00-09 System/03 Obsidian"],
+		["04", "00-09 System/04 Obsidian tooling"],
 	]),
 };
 eq(classifyFolderNote(true, "00-09 System", maps), "area", "area folder note");
@@ -105,11 +107,27 @@ eq(
 	"content note in wrong folder -> folder-mismatch"
 );
 
-// A filename that looks like an id but doesn't parse -> malformed-id.
+// A filename shaped like an attempted decimal id but invalid -> malformed-id (error).
+{
+	const f = checkNote(
+		fakeNote({ basename: "03.2 Foo", parentPath: "00-09 System/03 Obsidian", parentName: "03 Obsidian" }),
+		maps,
+		cfg
+	).find((x) => x.code === "malformed-id");
+	eq(!!f, true, "attempted decimal id but invalid -> malformed-id");
+	eq(f?.level, "error", "malformed-id is an error");
+}
+
+// Ordinary digit-leading titles must NOT be flagged malformed.
 eq(
-	codes(fakeNote({ basename: "03.2 Foo", parentPath: "00-09 System/03 Obsidian", parentName: "03 Obsidian" })).includes("malformed-id"),
-	true,
-	"filename looks like an id but is invalid -> malformed-id"
+	codes(fakeNote({ basename: "12 Monkeys review", parentPath: "70-79 Media", parentName: "70-79 Media" })).includes("malformed-id"),
+	false,
+	"plain digit-leading title -> not malformed"
+);
+eq(
+	codes(fakeNote({ basename: "3.14 Pi day", parentPath: "70-79 Media", parentName: "70-79 Media" })).includes("malformed-id"),
+	false,
+	"single-digit dotted title -> not malformed"
 );
 
 // A deep content folder note (04 CD Player) must NOT be flagged as a JD id.
@@ -118,6 +136,20 @@ eq(
 	0,
 	"deep content folder note: no findings"
 );
+
+// --- renderIndex: category home is a header, not a content row --------------
+{
+	const scan = {
+		...maps,
+		notes: [
+			fakeNote({ basename: "04 Obsidian tooling", parentPath: "00-09 System/04 Obsidian tooling", parentName: "04 Obsidian tooling" }),
+			fakeNote({ basename: "04.18 execute-code", parentPath: "00-09 System/04 Obsidian tooling", parentName: "04 Obsidian tooling" }),
+		],
+	} as unknown as VaultScan;
+	const md = renderIndex(null as never, cfg, scan);
+	eq(md.includes("`04.18`"), true, "index lists content id 04.18");
+	eq(md.includes("`04.00`"), false, "index does NOT list the category home 04.00 as its own row");
+}
 
 console.log(`\n${failures === 0 ? "PASS" : "FAIL"} — ${failures} failure(s)`);
 process.exitCode = failures === 0 ? 0 : 1;

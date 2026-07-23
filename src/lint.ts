@@ -33,12 +33,14 @@ export function checkNote(note: JdNote, maps: FolderMaps, cfg: JdConfig): LintFi
 	const add = (level: LintLevel, code: string, message: string) =>
 		out.push({ level, code, path, message });
 
-	// Filename looks like a JD id but doesn't derive a valid one (filename-
-	// canonical). Folder notes are exempt: a content folder note like
-	// "04 CD Player" legitimately starts with digits without being a JD id.
-	const nameLooksLikeId = /^[0-9]/.test(note.file.basename);
-	if (nameLooksLikeId && !note.parsed && !note.isFolderNote) {
-		add("warn", "malformed-id", `filename id "${note.nameId}" is not a valid JD identifier`);
+	// Filename looks like an attempted decimal id ("AC.Y…") but doesn't derive a
+	// valid one (filename-canonical). Scoped to the "\d\d.\d" shape so ordinary
+	// digit-leading titles ("12 Monkeys", "3.14 Pi day") aren't false-flagged.
+	// Folder notes are exempt: a content folder note like "04 CD Player"
+	// legitimately starts with digits without being a JD id.
+	const looksLikeAttemptedId = /^\d{2}\.\d/.test(note.file.basename);
+	if (looksLikeAttemptedId && !note.parsed && !note.isFolderNote) {
+		add("error", "malformed-id", `filename id "${note.nameId}" is not a valid JD identifier`);
 	}
 
 	if (!note.parsed) return out;

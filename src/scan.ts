@@ -95,19 +95,16 @@ export function deriveParsedId(
 	const isFolderNote = basename === parentName;
 	const nameId = idTokenFromName(basename);
 	const kind = classifyFolderNote(isFolderNote, parentPath, maps);
-	let raw: string | null;
-	if (kind === "area") {
-		raw = nameId; // "00-09"
-	} else if (kind === "category") {
-		raw = canonicalFolderNoteId(nameId, cfg); // "04" -> "04.00"
-	} else {
-		// Not an area/category folder note: only a content-id-shaped name token
-		// (AC.YY / NNNNN / NNNNN.YY) is a JD id. A bare "AC" / "A0-A9" here is a
-		// content folder, not category/area.
-		const p = parseJdId(nameId, cfg);
-		raw = p && p.kind !== "area" && p.kind !== "category" ? p.raw : null;
+	if (kind === "area") return parseJdId(nameId, cfg); // "00-09"
+	if (kind === "category") {
+		const raw = canonicalFolderNoteId(nameId, cfg); // "04" -> "04.00"
+		return raw ? parseJdId(raw, cfg) : null;
 	}
-	return raw ? parseJdId(raw, cfg) : null;
+	// Not an area/category folder note: only a content-id-shaped name token
+	// (AC.YY / NNNNN / NNNNN.YY) is a JD id. A bare "AC" / "A0-A9" here is a
+	// content folder, not category/area.
+	const p = parseJdId(nameId, cfg);
+	return p && p.kind !== "area" && p.kind !== "category" ? p : null;
 }
 
 /** Build the JdNote view of a single file. */
